@@ -1,0 +1,191 @@
+﻿@page "/games"
+@using BlazorCrudDotNet8.Application.Abstract
+@inject IGameService GameService
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<style>
+    .container {
+        margin-left: 100px;
+        margin-right: 200px;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+        .table th, .table td {
+            padding: 8px;
+            text-align: center;
+        }
+
+        .table tr:nth-child(even) {
+            background-color: #ffffff; /* Light gray */
+        }
+
+        .table tr:nth-child(odd) {
+            background-color: #f9f9f9; /* Gray */
+        }
+
+    .pagination {
+        margin-top: 20px;
+        display: flex;
+        justify-content : center;
+        align-items: center;
+    }
+
+        .pagination button {
+            background-color: #333; /* black */
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+            margin-left: 5px;
+        }
+
+        .pagination button:disabled {
+        background-color: #ddd; /* Light gray for disabled state */
+        color: #888; /* Dim text color for disabled state */
+        cursor: not-allowed;
+        }
+
+        .pagination select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-left: 5px;
+        }
+</style>
+
+<div style="margin-left: 100px; margin-right: 200px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3><b>Game List</b></h3>
+        <input type="text" @bind="searchTerm" placeholder="Search by Name or Email"
+              class="form-control" style="width: 300px;" />
+        <CreateGameButton />   
+    </div>
+
+    @if (games == null)
+    {
+        <span>Loading...</span>
+    }
+    else if (games.Count == 0)
+    {
+        <span>No games found</span>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Logged Email</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var game in GetFilteredGames())
+                {
+                    <tr>
+                        <td>@game.Name</td>
+                        <td>@game.Email</td>
+                        <td><EditGameButton Id="game.Id" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <button @onclick="PreviousPage" disabled="@IsFirstPage">Previous</button>
+            <span>Page @currentPage of @totalPages</span>
+            <button @onclick="NextPage" disabled="@IsLastPage">Next</button>
+
+            <label for="itemsPerPage">Items per page:</label>
+            <select id="itemsPerPage" @bind="itemsPerPage">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+            </select>
+        </div>
+    }
+</div>
+
+@code {
+    List<Game>? games = null;
+    int currentPage = 1;
+    int itemsPerPage = 5; // Default items per page
+    private string searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGames();
+    }
+
+    private async Task LoadGames()  
+    {
+        await Task.Delay(500); // Adding delay
+        games = await GameService.GetAllGames();
+    }
+
+    private void PreviousPage()
+    {
+        if (!IsFirstPage)
+        {
+            currentPage--;
+        }
+    }
+
+    private void NextPage()
+    {
+        if (!IsLastPage)
+        {
+            currentPage++;
+        }
+    }
+
+    //list visible using pagination 
+    private List<Game> GetVisibleGames()
+    {
+        if (games == null)
+        {
+            return new List<Game>();
+        }
+
+        var startIndex = (currentPage - 1) * itemsPerPage;
+        var endIndex = Math.Min(startIndex + itemsPerPage, games.Count);
+
+        return games.Skip(startIndex).Take(endIndex - startIndex).ToList();
+    }
+
+    //list visible after filter
+    private List<Game> GetFilteredGames()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            return GetVisibleGames();
+        }
+        return GetVisibleGames().Where(g =>
+        g.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true || 
+        g.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true).ToList(); //compares and ignore the case
+    }
+
+    // private void ChangeItemsPerPage()
+    // {
+    //    currentPage = 1; // Reset to the first page when changing items per page
+    //    StateHasChanged(); // Force a re-render
+    // } 
+
+    private bool IsFirstPage => currentPage == 1;
+    private bool IsLastPage => currentPage == totalPages;
+
+    private int totalPages => (int)Math.Ceiling((double)(games?.Count ?? 0) / itemsPerPage);
+}
